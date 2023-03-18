@@ -369,20 +369,26 @@ void sigchld_handler(int sig)
 //-1 means every child process
  while ((cid=waitpid(-1, &childstatus,flags))>0)
  {
+     //we first block all signals to do the computations (we don't wanna terminate with zombie childs)
+    sigprocmask(SIG_BLOCK,&allblocked,&current); // we block all signals and remember the current state
+    
     if(WIFSTOPPED(cid)){
         getjobpid(jobs,cid)->state= 3;
-        continue;
+        goto unblock;
     }
     //The child has not stopped, it terminated: we first remove the child
-    deletejob(jobs,cid);
-    //we first block all signals to do the computations (we don't wanna terminate with zombie childs)
-    sigprocmask(SIG_BLOCK,&allblocked,&current); // we block all signals and remember the current state
+     deletejob(jobs,cid);
      if(WIFEXITED(childstatus)){//best case
         printf("Child %d terminated normally \n ",cid);
+        goto unblock;
      }
-     else if(WIFSIGNALED(childstatus)){//terminated by the kernel's signal 
+    if(WIFSIGNALED(childstatus)){//terminated by the kernel's signal 
         printf("Child %d  terminated by signal \n ",cid);
+        goto unblock;
      } 
+
+     unblock:
+        sigprocmask(SIG_BLOCK,&current,NULL);
  }
  
 
